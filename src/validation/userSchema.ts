@@ -6,6 +6,7 @@ const userSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["User", "Vendor", "Admin"]).optional(),
   storeName: z.string().optional(),
+  isApproved: z.boolean().optional(),
 });
 
 export default userSchema;
