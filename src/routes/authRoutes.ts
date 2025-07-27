@@ -43,4 +43,20 @@ router.post(
   authController.resetPassword.bind(authController)
 );
 
+// NEW: Get all approved vendors (Admin only)
+router.get(
+  "/vendors/approved",
+  authenticateToken,
+  restrictTo("Admin"),
+  authController.getApprovedVendors.bind(authController)
+);
+
+// NEW: Get all unapproved vendors (Admin only)
+router.get(
+  "/vendors/unapproved",
+  authenticateToken,
+  restrictTo("Admin"),
+  authController.getUnapprovedVendors.bind(authController)
+);
+
 export default router;
