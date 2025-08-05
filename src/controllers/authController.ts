@@ -9,6 +9,7 @@ import {
   verifyRefreshToken,
 } from "../utils/token"; // Import token utilities
 import { generateOtp, sendOtpEmail } from "../utils/otp";
+import { uploadToCloudinarySingle } from "../middleware/uploadToCloudinary";
 
 dotenv.config();
 
@@ -19,19 +20,32 @@ export class AuthController {
       if (!parseResult.success) {
         return res.status(400).json({ errors: parseResult.error.issues });
       }
+
       const { name, email, password, role, storeName } = parseResult.data;
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // Create a temporary user object with core data
       const user = new User({
         name,
         email,
         password: hashedPassword,
         role: role || "User",
         storeName: role === "Vendor" ? storeName : undefined,
-        isApproved: role === "Vendor" ? false : undefined, // Vendor starts as unapproved
+        isApproved: role === "Vendor" ? false : undefined,
       });
 
+      // If an image is provided, upload it and add the data to the user object
+      if (req.file) {
+        const uploaded = await uploadToCloudinarySingle(
+          req.file,
+          `users/${user._id}`
+        );
+        user.image = uploaded;
+      }
+
+      // Save the user document to the database
       await user.save();
+
       res.status(201).json({
         message:
           role === "Vendor"
@@ -40,89 +54,13 @@ export class AuthController {
         user,
       });
     } catch (error: any) {
-      // Catch as 'any' for better error handling in TypeScript
       if (error.code === 11000) {
-        // Duplicate key error (e.g., email already exists)
         return res.status(409).json({ message: "Email already registered." });
       }
-      console.error("Signup error:", error); // Log the actual error
+      console.error("Signup error:", error);
       res
         .status(500)
-        .json({ message: "Error creating user", error: error.message }); // Send error message
-    }
-  }
-
-  // approve vendor functionality
-  async approveVendor(req: Request, res: Response) {
-    try {
-      const { userId } = req.params; // Destructure userId from params
-      const user = await User.findById(userId); // Find first to check role
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (user.role !== "Vendor") {
-        return res.status(400).json({ message: "User is not a vendor." });
-      }
-
-      if (user.isApproved) {
-        return res.status(409).json({ message: "Vendor is already approved." });
-      }
-
-      user.isApproved = true;
-      await user.save(); // Save the updated user
-
-      res.json({ message: "Vendor approved successfully", user });
-    } catch (error: any) {
-      console.error("Error approving vendor:", error);
-      res
-        .status(500)
-        .json({ message: "Error approving vendor", error: error.message });
-    }
-  }
-
-  // Login functionality
-  async login(req: Request, res: Response) {
-    try {
-      const { email, password } = req.body;
-      // Fetch user, including password for comparison
-      const user = await User.findOne({ email }).select("+password");
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Check password first before approval status for vendors
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      if (user.role === "Vendor" && !user.isApproved) {
-        return res
-          .status(403)
-          .json({ message: "Vendor account is awaiting approval." });
-      }
-
-      user.lastLogin = new Date();
-      await user.save();
-
-      const accessToken = generateAccessToken(user._id.toString(), user.role);
-      const refreshToken = generateRefreshToken(user._id.toString(), user.role);
-
-      res.json({
-        accessToken,
-        refreshToken,
-        role: user.role,
-        userId: user._id,
-        user, // Return the user object without password
-      });
-    } catch (error: any) {
-      console.error("Login error:", error);
-      res
-        .status(500)
-        .json({ message: "Error logging in", error: error.message });
+        .json({ message: "Error creating user", error: error.message });
     }
   }
 
@@ -160,8 +98,11 @@ export class AuthController {
       );
 
       // Optionally, if you want to rotate refresh tokens (recommended for better security)
-      // const newRefreshToken = generateRefreshToken(user._id.toString(), user.role);
-      // res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
+      const newRefreshToken = generateRefreshToken(
+        user._id.toString(),
+        user.role
+      );
+      res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
 
       res.json({ accessToken: newAccessToken });
     } catch (error: any) {
@@ -263,50 +204,6 @@ export class AuthController {
       res
         .status(500)
         .json({ message: "Error resetting password", error: error.message });
-    }
-  }
-
-  // NEW: Get all approved vendors
-  async getApprovedVendors(req: Request, res: Response) {
-    try {
-      // Find users with role 'Vendor' and isApproved true
-      const approvedVendors = await User.find({
-        role: "Vendor",
-        isApproved: true,
-      }).select("-password -resetPasswordOtp -resetPasswordExpires");
-      res.status(200).json({
-        message: "Approved vendors retrieved successfully",
-        count: approvedVendors.length,
-        vendors: approvedVendors,
-      });
-    } catch (error: any) {
-      console.error("Error fetching approved vendors:", error);
-      res.status(500).json({
-        message: "Error fetching approved vendors",
-        error: error.message,
-      });
-    }
-  }
-
-  // NEW: Get all unapproved vendors
-  async getUnapprovedVendors(req: Request, res: Response) {
-    try {
-      // Find users with role 'Vendor' and isApproved false
-      const unapprovedVendors = await User.find({
-        role: "Vendor",
-        isApproved: false,
-      }).select("-password -resetPasswordOtp -resetPasswordExpires");
-      res.status(200).json({
-        message: "Unapproved vendors retrieved successfully",
-        count: unapprovedVendors.length,
-        vendors: unapprovedVendors,
-      });
-    } catch (error: any) {
-      console.error("Error fetching unapproved vendors:", error);
-      res.status(500).json({
-        message: "Error fetching unapproved vendors",
-        error: error.message,
-      });
     }
   }
 }

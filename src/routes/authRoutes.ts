@@ -5,26 +5,24 @@ import {
   loginLimiter,
   resetPasswordLimiter,
 } from "../middleware/rateLimmiters";
-import { authenticateToken, restrictTo } from "../middleware/authMiddleware";
+
+import upload from "../middleware/uploadToServer";
 
 const router = Router();
 const authController = new AuthController();
 
 // Sign up (registration)
-router.post("/signup", authController.signUp.bind(authController));
-
-// Approve vendor (Admin only)
-router.put(
-  "/approve/:userId",
-  authenticateToken,
-  restrictTo("Admin"),
-  authController.approveVendor.bind(authController)
+router.post(
+  "/signup",
+  upload.single("image"), // Image field name in form-data
+  authController.signUp.bind(authController)
 );
-// New route for refreshing tokens
-router.post("/refresh-token", authController.refreshToken.bind(authController));
 
 // Login
 router.post("/login", loginLimiter, authController.login.bind(authController));
+
+// New route for refreshing tokens
+router.post("/refresh-token", authController.refreshToken.bind(authController));
 
 // Logout (stateless, just a success message)
 router.post("/logout", authController.logout.bind(authController));
@@ -41,22 +39,6 @@ router.post(
   "/reset-password",
   resetPasswordLimiter,
   authController.resetPassword.bind(authController)
-);
-
-// NEW: Get all approved vendors (Admin only)
-router.get(
-  "/vendors/approved",
-  authenticateToken,
-  restrictTo("Admin"),
-  authController.getApprovedVendors.bind(authController)
-);
-
-// NEW: Get all unapproved vendors (Admin only)
-router.get(
-  "/vendors/unapproved",
-  authenticateToken,
-  restrictTo("Admin"),
-  authController.getUnapprovedVendors.bind(authController)
 );
 
 export default router;
