@@ -64,6 +64,68 @@ export class AuthController {
     }
   }
 
+  // Login endpoint
+  async login(req: Request, res: Response) {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res
+          .status(400)
+          .json({ message: "Email and password are required." });
+      }
+
+      const user = await User.findOne({ email }).select("+password");
+
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password." });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid email or password." });
+      }
+
+      // If the user is a vendor, check approval status
+      if (user.role === "Vendor" && user.isApproved === false) {
+        return res
+          .status(403)
+          .json({ message: "Vendor account not approved yet." });
+      }
+
+      const accessToken = generateAccessToken(user._id.toString(), user.role);
+      const refreshToken = generateRefreshToken(user._id.toString(), user.role);
+
+      // You can optionally set these as cookies:
+      // For the access token, which expires in 15 minutes
+      res.cookie("token", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        // 15 minutes * 60 seconds * 1000 milliseconds = 900,000 ms
+        maxAge: 15 * 60 * 1000,
+      });
+
+      // For the refresh token, which expires in 7 days
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        // 7 days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds = 604,800,000 ms
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      res.status(200).json({
+        message: "Login successful",
+        user,
+      });
+    } catch (error: any) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed", error: error.message });
+    }
+  }
+
   // New endpoint for refreshing tokens
   async refreshToken(req: Request, res: Response) {
     const { refreshToken } = req.body;

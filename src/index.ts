@@ -11,6 +11,7 @@ import morgan from "morgan";
 import cors from "cors";
 
 import dbConnection from "./database/connect";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ const app = express();
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 const PORT = process.env.PORT || 3000;
 

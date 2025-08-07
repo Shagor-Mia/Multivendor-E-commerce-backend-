@@ -30,7 +30,7 @@ router.get(
   "/users/:userId",
   authenticateToken,
   restrictTo("Admin"),
-  adminController.getAllUsers.bind(adminController)
+  adminController.getSingleUserById.bind(adminController)
 );
 
 // NEW: Get all unapproved vendors (Admin only)
