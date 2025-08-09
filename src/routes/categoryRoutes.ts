@@ -1,13 +1,13 @@
-import { Router } from 'express';
-import { CategoryController } from '../controllers/categoryController';
-import { authenticateToken, restrictTo } from '../middleware/authMiddleware';
+import express from "express";
+import { CategoryController } from "../controllers/categoryController";
 
-const router = Router();
-const categoryController = new CategoryController();
+const router = express.Router();
+const controller = new CategoryController();
 
-router.post('/', authenticateToken, restrictTo('Admin'), categoryController.createCategory.bind(categoryController));
-router.get('/', categoryController.getCategories.bind(categoryController));
-router.put('/:categoryId', authenticateToken, restrictTo('Admin'), categoryController.updateCategory.bind(categoryController));
-router.delete('/:categoryId', authenticateToken, restrictTo('Admin'), categoryController.deleteCategory.bind(categoryController));
+router.post("/", controller.createCategory.bind(controller));
+router.get("/", controller.getCategories.bind(controller));
+router.get("/:id", controller.getCategoryById.bind(controller));
+router.put("/:id", controller.updateCategory.bind(controller));
+router.delete("/:id", controller.deleteCategory.bind(controller));
 
 export default router;

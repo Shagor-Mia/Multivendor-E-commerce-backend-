@@ -1,13 +1,28 @@
-import { Router } from 'express';
-import { ProductController } from '../controllers/productController';
-import { authenticateToken, restrictTo } from '../middleware/authMiddleware';
+import express from "express";
+import upload from "../middleware/uploadToServer";
+import { ProductController } from "../controllers/productController";
 
-const router = Router();
+const router = express.Router();
 const productController = new ProductController();
 
-router.post('/', authenticateToken, restrictTo('Vendor'), productController.createProduct.bind(productController));
-router.get('/', productController.getProducts.bind(productController));
-router.get('/vendor/:userId', productController.getVendorProducts.bind(productController));
-router.get('/category/:categoryId', productController.getCategoryProducts.bind(productController));
+// Create product with image upload middleware
+router.post(
+  "/",
+  upload.single("image"), // 'image' is the form field name for file upload
+  (req, res) => productController.createProduct(req, res)
+);
+
+// Update product with optional image upload
+router.put("/:productId", upload.single("image"), (req, res) =>
+  productController.updateProduct(req, res)
+);
+
+// Get products with filters and sorting (query params)
+router.get("/", (req, res) => productController.getProducts(req, res));
+
+// Delete product
+router.delete("/:productId", (req, res) =>
+  productController.deleteProduct(req, res)
+);
 
 export default router;

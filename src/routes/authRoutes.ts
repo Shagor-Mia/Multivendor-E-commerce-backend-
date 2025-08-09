@@ -7,7 +7,6 @@ import {
 } from "../middleware/rateLimmiters";
 
 import upload from "../middleware/uploadToServer";
-import { authenticateToken, restrictTo } from "../middleware/authMiddleware";
 
 const router = Router();
 const authController = new AuthController();

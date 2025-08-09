@@ -49,7 +49,7 @@ router.put(
 );
 
 router.delete(
-  "/:userId",
+  "/delete/:userId",
   authenticateToken,
   restrictTo("Admin"),
   adminController.deleteUser.bind(adminController)
