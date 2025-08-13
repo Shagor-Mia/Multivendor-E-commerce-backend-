@@ -5,7 +5,7 @@ import { verifyAccessToken } from "../utils/token";
 
 dotenv.config();
 
-interface AuthRequest extends Request {
+export interface AuthRequest extends Request {
   user?: { id: string; role: string };
   cookies: { token?: string }; // Add cookies property to the interface
 }

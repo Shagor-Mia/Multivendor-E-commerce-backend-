@@ -16,6 +16,16 @@ import cookieParser from "cookie-parser";
 dotenv.config();
 
 const app = express();
+
+app.use(
+  "/api/payments", // Correct path to your webhook
+  express.raw({ type: "application/json" }),
+  (req, res, next) => {
+    // You can add your webhook handler here directly or in its own file
+    const { stripeWebhookHandler } = require("./controllers/webhookController");
+    stripeWebhookHandler(req, res);
+  }
+);
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));

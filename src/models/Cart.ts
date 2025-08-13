@@ -1,12 +1,11 @@
 import mongoose, { Schema, Document } from "mongoose";
-import Product from "./Product";
 
 interface ICartItem {
   product: mongoose.Types.ObjectId;
   quantity: number;
 }
 
-interface IShoppingCart extends Document {
+export interface IShoppingCart extends Document {
   user: mongoose.Types.ObjectId;
   items: ICartItem[];
   totalPrice: number;
@@ -44,23 +43,6 @@ const ShoppingCartSchema: Schema = new Schema(
   },
   { timestamps: true }
 );
-
-//  Auto-calculate total price before saving
-ShoppingCartSchema.pre<IShoppingCart>("save", async function (next) {
-  if (!this.isModified("items")) return next(); // Only recalc if items changed
-
-  let total = 0;
-
-  for (const item of this.items) {
-    const product = await Product.findById(item.product).select("price");
-    if (product) {
-      total += product.price * item.quantity;
-    }
-  }
-
-  this.totalPrice = total;
-  next();
-});
 
 export default mongoose.model<IShoppingCart>(
   "ShoppingCart",

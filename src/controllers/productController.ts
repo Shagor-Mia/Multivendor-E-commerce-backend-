@@ -1,36 +1,40 @@
 import { Request, Response } from "express";
-import path from "path";
-import fs from "fs";
 import Product from "../models/Product";
 import Category from "../models/Category";
 import {
   deleteFromCloudinary,
   uploadToCloudinarySingle,
 } from "../middleware/uploadToCloudinary";
+import { AuthRequest } from "../middleware/authMiddleware";
 
 export class ProductController {
-  async createProduct(req: Request, res: Response) {
+  // ✅ The 'req' parameter now uses the AuthRequest interface
+  async createProduct(req: AuthRequest, res: Response) {
     try {
-      const { name, description, price, discount, status, category } = req.body;
+      // ✅ Now includes 'stock' from the request body
+      const { name, description, price, discount, status, category, stock } =
+        req.body;
+      const vendorId = req.user?.id;
+
+      if (!vendorId) {
+        return res.status(403).json({ message: "Vendor ID is missing." });
+      }
 
       if (!req.file) {
         return res.status(400).json({ message: "Image file is required." });
       }
 
-      // Upload image to Cloudinary via helper (which deletes local file)
       const uploadResult = await uploadToCloudinarySingle(
         req.file,
         "product-images"
       );
 
-      // Validate category
       const categoryExists = await Category.findById(category);
       if (!categoryExists) {
         await deleteFromCloudinary(uploadResult.public_id);
         return res.status(400).json({ message: "Invalid category" });
       }
 
-      // Create product with image as an object
       const product = await Product.create({
         name,
         description,
@@ -42,6 +46,9 @@ export class ProductController {
         },
         status,
         category,
+        vendor: vendorId,
+        // ✅ The stock value is explicitly converted to a number here
+        stock: Number(stock),
       });
 
       res.status(201).json({ message: "Product created", product });
@@ -51,7 +58,65 @@ export class ProductController {
     }
   }
 
-  async updateProduct(req: Request, res: Response) {
+  async getSingleVendorProduct(req: AuthRequest, res: Response) {
+    try {
+      const vendorId = req.user?.id;
+      const { productId } = req.params;
+
+      if (!vendorId) {
+        return res.status(403).json({ message: "Vendor ID is missing." });
+      }
+
+      // Find the product by its ID and ensure it belongs to the authenticated vendor
+      const product = await Product.findOne({
+        _id: productId,
+        vendor: vendorId,
+      })
+        .populate("category", "name")
+        .populate("vendor", "name email");
+
+      if (!product) {
+        return res
+          .status(404)
+          .json({ message: "Product not found or not owned by this vendor." });
+      }
+
+      res.status(200).json(product);
+    } catch (error) {
+      console.error("Get single product error:", error);
+      res.status(500).json({ message: "Error fetching product", error });
+    }
+  }
+
+  async getAllVendorProducts(req: AuthRequest, res: Response) {
+    try {
+      // Get the vendor's ID from the authenticated user
+      const vendorId = req.user?.id;
+      if (!vendorId) {
+        return res.status(403).json({ message: "Vendor ID is missing." });
+      }
+
+      const products = await Product.find({ vendor: vendorId })
+        .populate("category", "name")
+        .populate("vendor", "name email");
+
+      if (products.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "No products found for this vendor." });
+      }
+
+      res.json(products);
+    } catch (error) {
+      console.error("Get vendor products error:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching vendor products", error });
+    }
+  }
+
+  // ✅ The 'req' parameter now uses the AuthRequest interface
+  async updateProduct(req: AuthRequest, res: Response) {
     try {
       const {
         name,
@@ -63,10 +128,15 @@ export class ProductController {
         category,
         removeImage,
       } = req.body;
+      const vendorId = req.user?.id;
 
       const product = await Product.findById(req.params.productId);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (product.vendor.toString() !== vendorId) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       const updateData: any = {
@@ -167,11 +237,17 @@ export class ProductController {
     }
   }
 
-  async deleteProduct(req: Request, res: Response) {
+  // ✅ The 'req' parameter now uses the AuthRequest interface
+  async deleteProduct(req: AuthRequest, res: Response) {
     try {
+      const vendorId = req.user?.id;
       const product = await Product.findById(req.params.productId);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (product.vendor.toString() !== vendorId) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       if (product.image?.public_id) {

@@ -1,28 +1,52 @@
-import express from "express";
+import { Router } from "express";
 import upload from "../middleware/uploadToServer";
 import { ProductController } from "../controllers/productController";
+import { authenticateToken, restrictTo } from "../middleware/authMiddleware";
+import { Role } from "../models/User";
 
-const router = express.Router();
+const router = Router();
 const productController = new ProductController();
 
-// Create product with image upload middleware
+// Vendor-specific routes
 router.post(
   "/",
-  upload.single("image"), // 'image' is the form field name for file upload
-  (req, res) => productController.createProduct(req, res)
+  authenticateToken,
+  restrictTo(Role.Vendor),
+  upload.single("image"),
+  productController.createProduct.bind(productController)
 );
 
-// Update product with optional image upload
-router.put("/:productId", upload.single("image"), (req, res) =>
-  productController.updateProduct(req, res)
+// Route to get a vendor's own products
+router.get(
+  "/my-products",
+  authenticateToken,
+  restrictTo(Role.Vendor),
+  productController.getAllVendorProducts.bind(productController)
+);
+// Route to get a single product for the authenticated vendor
+router.get(
+  "/:productId",
+  authenticateToken,
+  restrictTo(Role.Vendor),
+  productController.getSingleVendorProduct.bind(productController)
 );
 
-// Get products with filters and sorting (query params)
-router.get("/", (req, res) => productController.getProducts(req, res));
-
-// Delete product
-router.delete("/:productId", (req, res) =>
-  productController.deleteProduct(req, res)
+router.put(
+  "/:productId",
+  authenticateToken,
+  restrictTo(Role.Vendor),
+  upload.single("image"),
+  productController.updateProduct.bind(productController)
 );
+
+router.delete(
+  "/:productId",
+  authenticateToken,
+  restrictTo(Role.Vendor),
+  productController.deleteProduct.bind(productController)
+);
+
+// Public route to get products (anyone can view)
+router.get("/", productController.getProducts.bind(productController));
 
 export default router;

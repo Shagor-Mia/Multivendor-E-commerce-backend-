@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import ShoppingCart from "../models/Cart";
 import Product from "../models/Product";
+import { IShoppingCart } from "../models/Cart";
 
 export class ShoppingCartController {
   // Get cart for logged-in user
@@ -45,17 +46,21 @@ export class ShoppingCartController {
         cart = new ShoppingCart({ user: userId, items: [] });
       }
 
-      // Check if product already in cart
       const itemIndex = cart.items.findIndex(
         (item) => item.product.toString() === productId
       );
 
       if (itemIndex > -1) {
-        // Update quantity
-        cart.items[itemIndex].quantity += quantity;
+        // Update quantity and total price
+        const existingItem = cart.items[itemIndex];
+        const oldQuantity = existingItem.quantity;
+        existingItem.quantity += quantity;
+        cart.totalPrice +=
+          product.price * (existingItem.quantity - oldQuantity);
       } else {
-        // Add new item
+        // Add new item and update total price
         cart.items.push({ product: productId, quantity });
+        cart.totalPrice += product.price * quantity;
       }
 
       await cart.save();
@@ -82,6 +87,19 @@ export class ShoppingCartController {
       const cart = await ShoppingCart.findOne({ user: userId });
       if (!cart) {
         return res.status(404).json({ message: "Cart not found" });
+      }
+
+      // Find the item to be removed to update total price
+      const itemToRemove = cart.items.find(
+        (item) => item.product.toString() === productId
+      );
+      if (itemToRemove) {
+        const product = await Product.findById(itemToRemove.product).select(
+          "price"
+        );
+        if (product) {
+          cart.totalPrice -= product.price * itemToRemove.quantity;
+        }
       }
 
       cart.items = cart.items.filter(
@@ -113,6 +131,7 @@ export class ShoppingCartController {
       }
 
       cart.items = [];
+      cart.totalPrice = 0; // Reset total price
       await cart.save();
 
       res.json({ message: "Cart cleared", cart });

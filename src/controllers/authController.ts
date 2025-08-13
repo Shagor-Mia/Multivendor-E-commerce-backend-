@@ -104,7 +104,7 @@ export class AuthController {
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
         // 15 minutes * 60 seconds * 1000 milliseconds = 900,000 ms
-        maxAge: 15 * 60 * 1000,
+        maxAge: 60 * 60 * 1000,
       });
 
       // For the refresh token, which expires in 7 days
