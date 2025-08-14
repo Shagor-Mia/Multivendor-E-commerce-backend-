@@ -7,6 +7,14 @@ import { Role } from "../models/User";
 const router = Router();
 const productController = new ProductController();
 
+// Public route to get products (anyone can view)
+router.get("/", productController.getProducts.bind(productController));
+
+router.get(
+  "/search-suggestion",
+  productController.getProductSuggestions.bind(productController)
+);
+
 // Vendor-specific routes
 router.post(
   "/",
@@ -45,8 +53,5 @@ router.delete(
   restrictTo(Role.Vendor),
   productController.deleteProduct.bind(productController)
 );
-
-// Public route to get products (anyone can view)
-router.get("/", productController.getProducts.bind(productController));
 
 export default router;

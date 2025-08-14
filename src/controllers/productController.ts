@@ -1,3 +1,4 @@
+import User, { Role } from "./../models/User";
 import { Request, Response } from "express";
 import Product from "../models/Product";
 import Category from "../models/Category";
@@ -115,7 +116,7 @@ export class ProductController {
     }
   }
 
-  // ✅ The 'req' parameter now uses the AuthRequest interface
+  //  The 'req' parameter now uses the AuthRequest interface
   async updateProduct(req: AuthRequest, res: Response) {
     try {
       const {
@@ -187,44 +188,51 @@ export class ProductController {
     }
   }
 
+  // get product category, minPrice, maxPrice, sortBy, order
   async getProducts(req: Request, res: Response) {
     try {
-      const { category, search, minPrice, maxPrice, sortBy, order } = req.query;
-
+      const { category, minPrice, maxPrice, sortBy, order } = req.query;
       const query: any = {};
 
+      // --------------------------
+      // Category filter (if provided)
+      // --------------------------
       if (category) {
         if (!Category.base.Types.ObjectId.isValid(category as string)) {
-          return res
-            .status(400)
-            .json({ message: "Invalid category ID format" });
+          const foundCategory = await Category.findOne({
+            name: { $regex: category, $options: "i" },
+          });
+          if (!foundCategory) {
+            return res.status(400).json({ message: "Category not found" });
+          }
+          query.category = foundCategory._id;
+        } else {
+          query.category = category;
         }
-        const categoryExists = await Category.findById(category);
-        if (!categoryExists) {
-          return res.status(400).json({ message: "Category not found" });
-        }
-        query.category = category;
       }
 
-      if (search) {
-        query.name = { $regex: search, $options: "i" };
-      }
-
+      // --------------------------
+      // Price range
+      // --------------------------
       if (minPrice || maxPrice) {
         query.price = {};
         if (minPrice) query.price.$gte = Number(minPrice);
         if (maxPrice) query.price.$lte = Number(maxPrice);
       }
 
+      // --------------------------
+      // Sorting
+      // --------------------------
       let sortQuery: any = {};
       if (sortBy) {
-        const sortField = sortBy.toString();
-        const sortOrder = order === "desc" ? -1 : 1;
-        sortQuery[sortField] = sortOrder;
+        sortQuery[sortBy.toString()] = order === "desc" ? -1 : 1;
       } else {
         sortQuery = { createdAt: -1 };
       }
 
+      // --------------------------
+      // Fetch products
+      // --------------------------
       const products = await Product.find(query)
         .populate("category", "name")
         .populate("vendor", "name email")
@@ -234,6 +242,59 @@ export class ProductController {
     } catch (error) {
       console.error("Get products error:", error);
       res.status(500).json({ message: "Error fetching products", error });
+    }
+  }
+
+  // Separate search-suggestion with fallback
+  // Separate search-suggestion with fallback returning full product data
+  async getProductSuggestions(req: Request, res: Response) {
+    try {
+      const { search, limit } = req.query;
+
+      if (!search || typeof search !== "string") {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+
+      const suggestionLimit = limit ? parseInt(limit as string) : 10;
+
+      // Build regex for case-insensitive matching
+      const searchRegex = new RegExp(search, "i");
+
+      // Find category IDs that match search
+      const matchedCategories = await Category.find({
+        name: searchRegex,
+      }).select("_id");
+
+      // Find vendor IDs (Users with Vendor role) that match search
+      const matchedVendors = await User.find({
+        role: "Vendor",
+        $or: [{ name: searchRegex }, { storeName: searchRegex }],
+      }).select("_id");
+
+      // Search products by:
+      // - Name
+      // - Product code
+      // - Category name match
+      // - Vendor name/storeName match
+      const products = await Product.find({
+        $or: [
+          { name: searchRegex },
+          { productCode: searchRegex },
+          { category: { $in: matchedCategories.map((c) => c._id) } },
+          { vendor: { $in: matchedVendors.map((v) => v._id) } },
+        ],
+      })
+        .limit(suggestionLimit)
+        .populate("vendor", "name email storeName")
+        .populate("category", "name")
+        .lean();
+
+      res.json(products);
+    } catch (error) {
+      console.error("Get product suggestions error:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching product suggestions", error });
     }
   }
 
