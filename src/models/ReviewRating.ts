@@ -4,8 +4,8 @@ import Product from "./Product";
 interface IReview extends Document {
   user: mongoose.Types.ObjectId;
   product: mongoose.Types.ObjectId;
-  rating: number;
-  review: string;
+  rating?: number; // optional
+  review?: string; // optional
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,39 +16,23 @@ interface IReviewModel extends Model<IReview> {
 
 const ReviewSchema: Schema<IReview> = new Schema(
   {
-    user: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    product: {
-      type: Schema.Types.ObjectId,
-      ref: "Product",
-      required: true,
-    },
-    rating: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 5,
-    },
-    review: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+    rating: { type: Number, min: 1, max: 5 },
+    review: { type: String, trim: true },
   },
   { timestamps: true }
 );
 
+// Unique one review per user per product
 ReviewSchema.index({ user: 1, product: 1 }, { unique: true });
 
-// Static method to calculate average rating and review count for a product
+// Static method for average rating
 ReviewSchema.statics.calculateAverageRating = async function (
   productId: mongoose.Types.ObjectId
 ) {
   const result = await this.aggregate([
-    { $match: { product: productId } },
+    { $match: { product: productId, rating: { $ne: null } } }, // only consider reviews with rating
     {
       $group: {
         _id: "$product",
@@ -65,7 +49,6 @@ ReviewSchema.statics.calculateAverageRating = async function (
         reviewCount: result[0].reviewCount,
       });
     } else {
-      // No reviews - reset fields
       await Product.findByIdAndUpdate(productId, {
         averageRating: 0,
         reviewCount: 0,
@@ -76,40 +59,26 @@ ReviewSchema.statics.calculateAverageRating = async function (
   }
 };
 
-// After save hook
+// Hooks for recalculating rating
 ReviewSchema.post("save", async function () {
   try {
     await (this.constructor as IReviewModel).calculateAverageRating(
       this.product
     );
-  } catch (error) {
-    console.error("Failed to update average rating after save:", error);
+  } catch (err) {
+    console.error(err);
   }
 });
 
-// After update hook (for findOneAndUpdate)
-ReviewSchema.post("findOneAndUpdate", async function (doc) {
+ReviewSchema.post("findOneAndUpdate", async function (doc: IReview | null) {
   if (doc) {
-    try {
-      await (doc.constructor as IReviewModel).calculateAverageRating(
-        doc.product
-      );
-    } catch (error) {
-      console.error("Failed to update average rating after update:", error);
-    }
+    await (doc.constructor as IReviewModel).calculateAverageRating(doc.product);
   }
 });
 
-// After delete hook (for findOneAndDelete)
-ReviewSchema.post("findOneAndDelete", async function (doc) {
+ReviewSchema.post("findOneAndDelete", async function (doc: IReview | null) {
   if (doc) {
-    try {
-      await (doc.constructor as IReviewModel).calculateAverageRating(
-        doc.product
-      );
-    } catch (error) {
-      console.error("Failed to update average rating after delete:", error);
-    }
+    await (doc.constructor as IReviewModel).calculateAverageRating(doc.product);
   }
 });
 

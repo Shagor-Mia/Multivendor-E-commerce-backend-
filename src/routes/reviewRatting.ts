@@ -1,23 +1,36 @@
-import express from "express";
-import { ReviewController } from "../controllers/reviewRatingController";
+import { Router } from "express";
+
 import { authenticateToken } from "../middleware/authMiddleware";
+import { ReviewController } from "../controllers/reviewRatingController";
 
-const router = express.Router();
+const router = Router();
 const reviewController = new ReviewController();
-
-// Add or update review by product ID
-router.post("/:productId/review", authenticateToken, (req, res) =>
-  reviewController.addOrUpdateReview(req, res)
+// for all user
+router.get(
+  "/products/:productId/reviews",
+  reviewController.getProductReviews.bind(reviewController)
+);
+// for logged in user
+router.post(
+  "/products/:productId/reviews",
+  authenticateToken,
+  reviewController.addReview.bind(reviewController)
+);
+router.put(
+  "/products/:reviewId",
+  authenticateToken,
+  reviewController.updateReview.bind(reviewController)
+);
+router.delete(
+  "/products/:reviewId",
+  authenticateToken,
+  reviewController.deleteReview.bind(reviewController)
 );
 
-// Delete review by product ID (for current user)
-router.delete("/:productId/review", authenticateToken, (req, res) =>
-  reviewController.deleteReview(req, res)
-);
-
-// Get all reviews for a product
-router.get("/:productId/reviews", authenticateToken, (req, res) =>
-  reviewController.getProductReviews(req, res)
+router.get(
+  "/products/:productId/my-review",
+  authenticateToken,
+  reviewController.getMyReview.bind(reviewController)
 );
 
 export default router;

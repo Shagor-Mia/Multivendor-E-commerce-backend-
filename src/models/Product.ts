@@ -14,6 +14,7 @@ interface IProduct extends Document {
   category: mongoose.Types.ObjectId;
   averageRating: number;
   reviewCount: number;
+
   stock: number;
   status: "In Stock" | "Stock Out";
   readonly finalPrice: number; // readonly because it's derived
@@ -42,6 +43,7 @@ const ProductSchema: Schema = new Schema(
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
     averageRating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
+
     status: { type: String, enum: ["In Stock", "Stock Out"], required: true },
     stock: { type: Number, required: true, default: 0 },
     createdAt: { type: Date, default: Date.now },
