@@ -8,6 +8,7 @@ interface ICartItem {
 export interface IShoppingCart extends Document {
   user: mongoose.Types.ObjectId;
   items: ICartItem[];
+  itemsCount: number;
   totalPrice: number;
   updatedAt: Date;
   createdAt: Date;
@@ -37,6 +38,10 @@ const ShoppingCartSchema: Schema = new Schema(
     },
     items: [CartItemSchema],
     totalPrice: {
+      type: Number,
+      default: 0,
+    },
+    itemsCount: {
       type: Number,
       default: 0,
     },

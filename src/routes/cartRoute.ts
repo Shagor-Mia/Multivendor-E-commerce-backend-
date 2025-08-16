@@ -1,22 +1,39 @@
 import express from "express";
-import { ShoppingCartController } from "../controllers/cartController";
 import { authenticateToken } from "../middleware/authMiddleware";
+import { ShoppingCartController } from "../controllers/cartController";
 
 const router = express.Router();
-const cartCtrl = new ShoppingCartController();
-
-router.use(authenticateToken); // All routes require auth
+const cartController = new ShoppingCartController();
 
 // Get current user's cart
-router.get("/", cartCtrl.getCart.bind(cartCtrl));
+router.get("/", authenticateToken, cartController.getCart.bind(cartController));
 
-// Add product or update quantity
-router.post("/add", cartCtrl.addItem.bind(cartCtrl));
+// Add item to cart
+router.post(
+  "/",
+  authenticateToken,
+  cartController.addItem.bind(cartController)
+);
 
-// Remove product by productId param
-router.delete("/remove/:productId", cartCtrl.removeItem.bind(cartCtrl));
+// Update quantity of specific product in cart
+router.put(
+  "/:productId",
+  authenticateToken,
+  cartController.updateQuantity.bind(cartController)
+);
+
+// Remove specific product from cart
+router.delete(
+  "/:productId",
+  authenticateToken,
+  cartController.removeItem.bind(cartController)
+);
 
 // Clear entire cart
-router.delete("/clear", cartCtrl.clearCart.bind(cartCtrl));
+router.delete(
+  "/",
+  authenticateToken,
+  cartController.clearCart.bind(cartController)
+);
 
 export default router;

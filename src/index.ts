@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import userRoutes from "./routes/userRoutes";
 import productRoutes from "./routes/productRoutes";
 import ratingRoutes from "./routes/reviewRatting";
+import cartRoutes from "./routes/cartRoute";
 import paymentRoutes from "./routes/paymentRoutes";
 import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
@@ -53,6 +54,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/ratings", ratingRoutes);
+app.use("/api/cart", cartRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/categories", categoryRoutes);
 
