@@ -5,6 +5,7 @@ import userRoutes from "./routes/userRoutes";
 import productRoutes from "./routes/productRoutes";
 import ratingRoutes from "./routes/reviewRatting";
 import cartRoutes from "./routes/cartRoute";
+import orderRoutes from "./routes/orderRoute";
 import paymentRoutes from "./routes/paymentRoutes";
 import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
@@ -14,28 +15,26 @@ import cors from "cors";
 
 import dbConnection from "./database/connect";
 import cookieParser from "cookie-parser";
+import { stripeWebhookHandler } from "./controllers/webhookController";
 
 dotenv.config();
 
 const app = express();
 
-app.use(
-  "/api/payments", // Correct path to your webhook
+dbConnection();
+// ✅ Stripe webhook BEFORE express.json()
+app.post(
+  "/api/payments/webhook",
   express.raw({ type: "application/json" }),
-  (req, res, next) => {
-    // You can add your webhook handler here directly or in its own file
-    const { stripeWebhookHandler } = require("./controllers/webhookController");
-    stripeWebhookHandler(req, res);
-  }
+  stripeWebhookHandler
 );
+
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 const PORT = process.env.PORT || 3000;
-
-dbConnection();
 
 app.use(
   cors({
@@ -55,6 +54,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/ratings", ratingRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/categories", categoryRoutes);
 
