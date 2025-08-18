@@ -2,11 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import User from "../models/User";
 import dotenv from "dotenv";
 import { verifyAccessToken } from "../utils/token";
+import mongoose from "mongoose";
 
 dotenv.config();
 
 export interface AuthRequest extends Request {
-  user?: { id: string; role: string };
+  user?: { id: string; _id: mongoose.Types.ObjectId; role: string };
   cookies: { token?: string }; // Add cookies property to the interface
 }
 
@@ -37,7 +38,11 @@ export const authenticateToken = async (
       return res.status(404).json({ message: "User not found" });
     }
 
-    req.user = { id: decoded.id, role: decoded.role };
+    req.user = {
+      id: decoded.id,
+      _id: new mongoose.Types.ObjectId(decoded.id),
+      role: decoded.role,
+    };
     next();
   } catch (error) {
     // If the token is invalid or expired

@@ -12,7 +12,8 @@ export class OrderController {
     session.startTransaction();
 
     try {
-      const userId = (req as any).user._id as mongoose.Types.ObjectId;
+      const userId = (req as any).user.id as mongoose.Types.ObjectId;
+
       const { shippingAddress, billingAddress } = req.body;
 
       if (!shippingAddress || !billingAddress) {
@@ -244,3 +245,9 @@ export class OrderController {
     }
   }
 }
+
+// {
+//     "orderId": "68a32525d91f862b8304b1f0",
+//     "clientSecret": "pi_3RxSksJuMyFIWY0p0HafIX41_secret_XpG7Z8YpmXV5CLd1DYQ2X9iP9",
+//     "amount": 5400
+// }
