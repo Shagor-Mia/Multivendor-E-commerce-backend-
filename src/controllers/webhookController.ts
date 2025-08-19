@@ -8,74 +8,101 @@ import Product from "../models/Product";
 
 export const stripeWebhookHandler = async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string | undefined;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET as string;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      (req as any).rawBody,
-      sig!,
-      webhookSecret
-    );
+    // Stripe requires raw body
+    event = stripe.webhooks.constructEvent(req.body, sig!, webhookSecret);
+    console.log("✅ Webhook received:", event.type);
   } catch (err: any) {
-    console.error("Webhook signature verification failed:", err.message);
+    console.error("❌ Webhook signature verification failed:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  switch (event.type) {
-    case "payment_intent.succeeded": {
-      const pi = event.data.object as Stripe.PaymentIntent;
-      try {
-        const order = await Order.findOne({ paymentIntentId: pi.id }).populate(
-          "items.product"
-        );
-        if (order) {
-          order.paymentStatus = "paid";
-          order.status = "paid";
-          await order.save();
+  try {
+    switch (event.type) {
+      case "payment_intent.succeeded": {
+        const pi = event.data.object as Stripe.PaymentIntent;
+        console.log("💰 PaymentIntent succeeded:", pi.id);
 
-          // ✅ Clear cart after payment success
-          await ShoppingCart.findOneAndUpdate(
-            { user: order.user },
-            { items: [], totalPrice: 0, itemsCount: 0 }
+        const orderId = pi.metadata.orderId;
+        const order = await Order.findById(orderId);
+        if (!order) {
+          console.warn(
+            "⚠️ No order found for PaymentIntent:",
+            pi.id,
+            "Order ID:",
+            orderId
           );
+          break;
         }
-      } catch (err) {
-        console.error("Error handling payment_intent.succeeded:", err);
-      }
-      break;
-    }
 
-    case "payment_intent.payment_failed": {
-      const pi = event.data.object as Stripe.PaymentIntent;
-      try {
-        const order = await Order.findOne({ paymentIntentId: pi.id }).populate(
-          "items.product"
+        // Update order status
+        order.paymentStatus = "paid";
+        order.status = "paid";
+        order.paymentIntentId = pi.id; // save just in case
+        await order.save();
+        console.log(`✅ Order ${order._id} marked as PAID`);
+
+        // Clear user's cart
+        const cart = await ShoppingCart.findOneAndUpdate(
+          { user: order.user },
+          { items: [], itemsCount: 0, totalPrice: 0 },
+          { new: true }
         );
-        if (order) {
-          order.paymentStatus = "failed";
-          order.status = "cancelled";
-          await order.save();
+        if (cart) console.log(`🛒 Cart cleared for user ${order.user}`);
+        else console.warn(`⚠️ No cart found for user ${order.user}`);
 
-          // ✅ Restore stock because payment failed
-          for (const item of order.items) {
-            const product = await Product.findById(item.product);
-            if (product) {
-              product.stock += item.quantity;
-              product.status = product.stock > 0 ? "In Stock" : "Stock Out";
-              await product.save();
-            }
+        break;
+      }
+
+      case "payment_intent.payment_failed": {
+        const pi = event.data.object as Stripe.PaymentIntent;
+        console.log("❌ PaymentIntent failed:", pi.id);
+
+        const orderId = pi.metadata.orderId;
+        const order = await Order.findById(orderId).populate("items.product");
+        if (!order) {
+          console.warn(
+            "⚠️ No order found for failed PaymentIntent:",
+            pi.id,
+            "Order ID:",
+            orderId
+          );
+          break;
+        }
+
+        // Update order status
+        order.paymentStatus = "failed";
+        order.status = "cancelled";
+        order.paymentIntentId = pi.id; // save just in case
+        await order.save();
+        console.log(`⚠️ Order ${order._id} marked as FAILED/CANCELLED`);
+
+        // Restore stock for products
+        for (const item of order.items) {
+          const product = await Product.findById(item.product);
+          if (product) {
+            product.stock += item.quantity;
+            product.status = product.stock > 0 ? "In Stock" : "Stock Out";
+            await product.save();
+            console.log(
+              `🔄 Restored stock for product ${product._id}: +${item.quantity}`
+            );
           }
         }
-      } catch (err) {
-        console.error("Error handling payment_intent.payment_failed:", err);
+        break;
       }
-      break;
+
+      default:
+        console.log(`ℹ️ Unhandled event type: ${event.type}`);
     }
 
-    default:
-      console.log(`Unhandled event type: ${event.type}`);
+    res.json({ received: true });
+  } catch (err) {
+    console.error("❌ Error processing Stripe webhook:", err);
+    res.status(500).send("Webhook processing error");
   }
-
-  res.json({ received: true });
 };

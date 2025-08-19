@@ -12,8 +12,7 @@ export class OrderController {
     session.startTransaction();
 
     try {
-      const userId = (req as any).user.id as mongoose.Types.ObjectId;
-
+      const userId = (req as any).user._id as mongoose.Types.ObjectId;
       const { shippingAddress, billingAddress } = req.body;
 
       if (!shippingAddress || !billingAddress) {
@@ -24,7 +23,7 @@ export class OrderController {
           .json({ message: "Shipping and billing addresses are required" });
       }
 
-      // Load cart with product details
+      // Load cart
       const cart = await ShoppingCart.findOne({ user: userId })
         .populate("items.product")
         .session(session);
@@ -38,7 +37,7 @@ export class OrderController {
       const orderItems: any[] = [];
       let total = 0;
 
-      // Reserve stock and calculate total
+      // Reserve stock & calculate total
       for (const ci of cart.items) {
         const product = ci.product as any;
         if (!product) {
@@ -49,17 +48,17 @@ export class OrderController {
             .json({ message: "One of the cart products was not found" });
         }
 
-        const price = product.finalPrice || product.price; // Use discounted price if any
-
+        const price = product.finalPrice || product.price;
         if (product.stock < ci.quantity) {
           await session.abortTransaction();
           session.endSession();
-          return res.status(400).json({
-            message: `Insufficient stock for product ${product.name}`,
-          });
+          return res
+            .status(400)
+            .json({
+              message: `Insufficient stock for product ${product.name}`,
+            });
         }
 
-        // Reserve stock
         product.stock -= ci.quantity;
         product.status = product.stock > 0 ? "In Stock" : "Stock Out";
         await product.save({ session });
@@ -72,8 +71,8 @@ export class OrderController {
         total += price * ci.quantity;
       }
 
-      // Create order record
-      const [order] = await Order.create(
+      // Create order
+      const order = await Order.create(
         [
           {
             user: userId,
@@ -88,27 +87,26 @@ export class OrderController {
         { session }
       );
 
+      const savedOrder = order[0]; // Single order from array
+
       // Create Stripe PaymentIntent
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(total * 100),
         currency: process.env.STRIPE_CURRENCY || "usd",
         metadata: {
           userId: userId.toString(),
-          orderId: order._id.toString(),
+          orderId: savedOrder._id.toString(),
         },
       });
 
-      // Attach PaymentIntent to order
-      order.paymentIntentId = paymentIntent.id;
-      await order.save({ session });
+      savedOrder.paymentIntentId = paymentIntent.id;
+      await savedOrder.save({ session });
 
       await session.commitTransaction();
       session.endSession();
 
-      // ✅ Cart clearing will happen in webhook after payment success
-
-      res.status(201).json({
-        orderId: order._id,
+      return res.status(201).json({
+        orderId: savedOrder._id,
         clientSecret: paymentIntent.client_secret,
         amount: total,
       });
@@ -116,7 +114,9 @@ export class OrderController {
       await session.abortTransaction();
       session.endSession();
       console.error("createOrder error:", err);
-      res.status(500).json({ message: "Unable to create order", error: err });
+      return res
+        .status(500)
+        .json({ message: "Unable to create order", error: err });
     }
   }
 
@@ -245,9 +245,3 @@ export class OrderController {
     }
   }
 }
-
-// {
-//     "orderId": "68a32525d91f862b8304b1f0",
-//     "clientSecret": "pi_3RxSksJuMyFIWY0p0HafIX41_secret_XpG7Z8YpmXV5CLd1DYQ2X9iP9",
-//     "amount": 5400
-// }
