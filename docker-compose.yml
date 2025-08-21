@@ -1,0 +1,30 @@
+# for building docker, docker-compose up --build
+# for restart,docker-compose up then docker-compose logs -f backend
+# for stop ,docker-compose-down
+
+# docker-compose.yml (Base for Production)
+
+version: "3.9"
+services:
+  backend:
+    build: .
+    container_name: multivendor-backend
+    ports:
+      - "4000:4000" # match your .env PORT
+    env_file:
+      - .env
+
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:6
+    container_name: multivendor-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:

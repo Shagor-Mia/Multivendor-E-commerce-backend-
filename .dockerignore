@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# build outputs
+dist
+
+# git
+.git
+.gitignore
+
+# env files (do not bake secrets into the image)
+.env
+.env.local
+
+# IDE & system files
+.vscode
+.idea
+.DS_Store
