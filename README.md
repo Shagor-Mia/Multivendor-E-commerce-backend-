@@ -64,21 +64,25 @@ npm start
 ### API Endpoints
 
 - **Authentication**
+
   - `POST /api/auth/login`: User login
 
 - **Users**
+
   - `POST /api/users`: Create a new user
   - `GET /api/users`: Get all users (Admin only)
   - `DELETE /api/users/:userId`: Delete a user (Admin only)
   - `PUT /api/users/approve/:userId`: Approve a vendor (Admin only)
 
 - **Categories**
+
   - `POST /api/categories`: Create a new category (Admin only)
   - `GET /api/categories`: Get all categories
   - `PUT /api/categories/:categoryId`: Update a category (Admin only)
   - `DELETE /api/categories/:categoryId`: Delete a category (Admin only)
 
 - **Products**
+
   - `POST /api/products`: Create a new product (Vendor only)
   - `GET /api/products`: Get all products
   - `GET /api/products/vendor/:userId`: Get products by vendor
@@ -88,5 +92,7 @@ npm start
   - `POST /api/payments/create-payment-intent`: Create a payment intent (User only)
   - `GET /api/payments/vendor/:userId`: Get payments for a vendor (Vendor and Admin only)
 
-## License
+## Stripe payment method using Stripe CLI
 
+- stripe listen --forward-to localhost:4000/api/payments/webhook
+- stripe trigger payment_intent.succeeded --add 'payment_intent:metadata[orderId]=68a6a0497fbd6bb5de51afdb'
