@@ -14,7 +14,10 @@ router.post("/create", authenticateToken, (req, res) =>
 router.get("/:orderId/status", authenticateToken, (req, res) =>
   orderController.getOrderStatus(req, res)
 );
-
+// ✅ Get all orders for logged-in user
+router.get("/myOrders", authenticateToken, (req, res) =>
+  orderController.getMyOrders(req, res)
+);
 // ✅ Admin endpoints
 router.get("/all", authenticateToken, restrictTo("Admin"), (req, res) =>
   orderController.getAllOrders(req, res)
